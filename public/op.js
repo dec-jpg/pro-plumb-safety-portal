@@ -1,4 +1,5 @@
 // Operative pages opened from WhatsApp links: toolbox talks (/t/TOKEN) and job packs (/j/TOKEN).
+const BRAND = {};
 (() => {
   const app = document.getElementById('app');
   const [MODE, TOKEN] = location.pathname.split('/').filter(Boolean);
@@ -96,15 +97,23 @@
   // One page: the whole talk, then the sign-off at the bottom (the standard Safety Simplified toolbox talk format).
   function onePage(wrong = []) {
     const qs = talk.questions || [];
-    render(`<div class="si-read">${whoBar()}
-      ${talk.intro ? `<div class="ind-section"><div class="body">${esc(talk.intro)}</div></div>` : ''}
-      ${talk.sections.map(s => `<div class="ind-section">${s.heading ? `<h2>${esc(s.heading)}</h2>` : ''}<div class="body">${esc(s.body)}</div></div>`).join('')}</div>
-      ${qs.length ? `<h1>Check your understanding</h1>
+    const num = n => `<span class="tbt-num">${n}</span>`;
+    document.querySelector('.si-head').style.display = 'none';
+    render(`<article class="tbt">
+      <div class="tbt-hero"><p class="tbt-ref">${esc(BRAND.name || '')} · Toolbox talk · ${esc(talk.ref || '')}</p><h1>${esc(talk.title)}</h1>
+        <p class="tbt-sub">Read the talk, then sign at the bottom to record completion.</p></div>
+      ${whoBar()}
+      ${talk.intro ? `<section class="tbt-sec">${num(1)}<h2>Why we are having this talk</h2><div class="body">${esc(talk.intro)}</div></section>` : ''}
+      ${talk.sections.map((s, i) => `<section class="tbt-sec">${num(i + (talk.intro ? 2 : 1))}${s.heading ? `<h2>${esc(s.heading)}</h2>` : ''}<div class="body">${esc(s.body)}</div></section>`).join('')}
+      ${qs.length ? `<section class="tbt-sec">${num(talk.sections.length + (talk.intro ? 2 : 1))}<h2>Check your understanding</h2>
         ${wrong.length ? `<div class="note err">${wrong.length === 1 ? 'One answer is' : `${wrong.length} answers are`} not right. Have another look and try again.</div>` : '<p class="muted">Every answer needs to be right to sign.</p>'}
         ${qs.map((x, i) => `<div class="quiz-q ${wrong.includes(i) ? 'wrong' : ''}"><b>${i + 1}. ${esc(x.question)}</b><div class="opts">
-          ${x.options.map((o, j) => `<label><input type="radio" name="q${i}" value="${j}"> ${esc(o)}</label>`).join('')}</div></div>`).join('')}` : ''}
-      <h1>Sign to confirm</h1><p class="muted">By signing you confirm you have read and understood this toolbox talk and will follow it.</p>
-      ${sigBlock}<button class="btn big" id="go">Sign</button>`);
+          ${x.options.map((o, j) => `<label><input type="radio" name="q${i}" value="${j}"> ${esc(o)}</label>`).join('')}</div></div>`).join('')}</section>` : ''}
+      <section class="tbt-sec tbt-sign">${num(talk.sections.length + (talk.intro ? 2 : 1) + (qs.length ? 1 : 0))}<h2>Sign-off</h2>
+        <p class="muted">I confirm I have read and understood this toolbox talk and will apply it in my work.</p>
+        ${sigBlock}<button class="btn big" id="go">Sign off toolbox talk</button></section>
+      <p class="tbt-foot">${esc(talk.ref || '')} · Prepared by Safety Simplified Ltd for ${esc(BRAND.name || '')}</p>
+    </article>`);
     const pad = wireSig();
     let attempt = 1;
     $('#go').onclick = async () => {
@@ -194,7 +203,7 @@
     const go = MODE === 't' ? toolboxTalk : jobPack;
     go().catch(e => render(`<div class="note err">${esc(e.message)}</div>`));
   }
-  fetch('/api/p/brand').then(r => r.json()).then(b => { document.getElementById('logo').alt = b.name; }).catch(() => {});
+  fetch('/api/p/brand').then(r => r.json()).then(b => { Object.assign(BRAND, b); document.getElementById('logo').alt = b.name; }).catch(() => {});
   me = store.get();
   if (!me || !me.name) identify(); else start();
 })();
