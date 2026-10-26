@@ -29,7 +29,7 @@
   function head(title, sub) { document.getElementById('title').textContent = title; document.getElementById('sub').textContent = sub || ''; document.title = title; }
   function showErr(msg) {
     let n = $('.note.err');
-    if (!n) { n = document.createElement('div'); n.className = 'note err'; app.prepend(n); }
+    if (!n) { n = document.createElement('div'); n.className = 'note err'; const go = $('#go'); if (go) go.before(n); else app.prepend(n); }
     n.textContent = msg; n.scrollIntoView({ block: 'center', behavior: 'smooth' });
   }
   function busy(btn, on, label) {
@@ -90,19 +90,40 @@
     head(talk.title, talk.ref ? `Toolbox talk · ${talk.ref}` : 'Toolbox talk');
     if (d.signed) return done('Already signed', 'You have already signed this toolbox talk. Nothing more to do.');
     if (talk.closed) return render(`${whoBar()}<div class="note warn">This toolbox talk has been closed. Ask the office if you still need to sign it.</div>`);
-    if (talk.intro) return render(`${whoBar()}<div class="ind-section"><div class="body">${esc(talk.intro)}</div></div><button class="btn big" id="next">Start</button>`), ($('#next').onclick = () => section(0));
-    section(0);
+    onePage();
   }
 
-  function section(i) {
-    const s = talk.sections[i];
-    if (!s) return quiz(talk.questions.map(() => null), 1);
-    render(`${whoBar()}<p class="ind-progress">Part ${i + 1} of ${talk.sections.length}</p>
-      <div class="ind-section">${s.heading ? `<h2>${esc(s.heading)}</h2>` : ''}<div class="body">${esc(s.body)}</div></div>
-      <button class="btn big" id="next">${i + 1 < talk.sections.length ? 'Next' : talk.questions.length ? 'Answer the questions' : 'Sign'}</button>
-      ${i > 0 ? '<p class="link-row"><button class="btn quiet" id="prev">Back</button></p>' : ''}`);
-    $('#next').onclick = () => section(i + 1);
-    if ($('#prev')) $('#prev').onclick = () => section(i - 1);
+  // One page: the whole talk, then the sign-off at the bottom (the standard Safety Simplified toolbox talk format).
+  function onePage(wrong = []) {
+    const qs = talk.questions || [];
+    render(`${whoBar()}
+      ${talk.intro ? `<div class="ind-section"><div class="body">${esc(talk.intro)}</div></div>` : ''}
+      ${talk.sections.map(s => `<div class="ind-section">${s.heading ? `<h2>${esc(s.heading)}</h2>` : ''}<div class="body">${esc(s.body)}</div></div>`).join('')}
+      ${qs.length ? `<h1>Check your understanding</h1>
+        ${wrong.length ? `<div class="note err">${wrong.length === 1 ? 'One answer is' : `${wrong.length} answers are`} not right. Have another look and try again.</div>` : '<p class="muted">Every answer needs to be right to sign.</p>'}
+        ${qs.map((x, i) => `<div class="quiz-q ${wrong.includes(i) ? 'wrong' : ''}"><b>${i + 1}. ${esc(x.question)}</b><div class="opts">
+          ${x.options.map((o, j) => `<label><input type="radio" name="q${i}" value="${j}"> ${esc(o)}</label>`).join('')}</div></div>`).join('')}` : ''}
+      <h1>Sign to confirm</h1><p class="muted">By signing you confirm you have read and understood this toolbox talk and will follow it.</p>
+      ${sigBlock}<button class="btn big" id="go">Sign</button>`);
+    const pad = wireSig();
+    let attempt = 1;
+    $('#go').onclick = async () => {
+      const a = qs.map((_, i) => { const el = app.querySelector(`input[name=q${i}]:checked`); return el ? Number(el.value) : null; });
+      if (a.some(v => v === null)) return showErr('Answer every question.');
+      if (pad.empty()) return showErr('Sign in the box first.');
+      const btn = $('#go'); busy(btn, true, 'Sending');
+      try {
+        if (qs.length) { const c = await api(`/t/${TOKEN}/check`, { answers: a }); if (c.wrong.length) { attempt++; busy(btn, false); return showWrong(c.wrong); } }
+        const r = await api(`/t/${TOKEN}/sign`, { answers: a, signature: pad.data(), attempts: attempt });
+        if (r.ok === false) { attempt++; busy(btn, false); return showWrong(r.wrong); }
+        done('Signed', 'Thanks. Your signature has been recorded.');
+      } catch (e) { busy(btn, false); showErr(e.message); }
+    };
+    function showWrong(w) {
+      app.querySelectorAll('.quiz-q').forEach((el, i) => el.classList.toggle('wrong', w.includes(i)));
+      showErr(`${w.length === 1 ? 'One answer is' : `${w.length} answers are`} not right. Have another look and try again.`);
+      const first = app.querySelector('.quiz-q.wrong'); if (first) first.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
   }
 
   function quiz(answers, attempt, wrong = []) {
