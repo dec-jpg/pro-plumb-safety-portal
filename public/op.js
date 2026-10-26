@@ -96,9 +96,9 @@
   // One page: the whole talk, then the sign-off at the bottom (the standard Safety Simplified toolbox talk format).
   function onePage(wrong = []) {
     const qs = talk.questions || [];
-    render(`${whoBar()}
+    render(`<div class="si-read">${whoBar()}
       ${talk.intro ? `<div class="ind-section"><div class="body">${esc(talk.intro)}</div></div>` : ''}
-      ${talk.sections.map(s => `<div class="ind-section">${s.heading ? `<h2>${esc(s.heading)}</h2>` : ''}<div class="body">${esc(s.body)}</div></div>`).join('')}
+      ${talk.sections.map(s => `<div class="ind-section">${s.heading ? `<h2>${esc(s.heading)}</h2>` : ''}<div class="body">${esc(s.body)}</div></div>`).join('')}</div>
       ${qs.length ? `<h1>Check your understanding</h1>
         ${wrong.length ? `<div class="note err">${wrong.length === 1 ? 'One answer is' : `${wrong.length} answers are`} not right. Have another look and try again.</div>` : '<p class="muted">Every answer needs to be right to sign.</p>'}
         ${qs.map((x, i) => `<div class="quiz-q ${wrong.includes(i) ? 'wrong' : ''}"><b>${i + 1}. ${esc(x.question)}</b><div class="opts">
